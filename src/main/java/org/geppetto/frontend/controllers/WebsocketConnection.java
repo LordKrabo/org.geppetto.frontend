@@ -32,8 +32,6 @@
  *******************************************************************************/
 package org.geppetto.frontend.controllers;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -43,10 +41,13 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.catalina.websocket.MessageInbound;
 import org.apache.catalina.websocket.WsOutbound;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.eclipse.emf.common.util.BasicEList;
+import org.eclipse.emf.common.util.EList;
 import org.geppetto.core.common.GeppettoExecutionException;
 import org.geppetto.core.common.GeppettoInitializationException;
 import org.geppetto.core.manager.IGeppettoManager;
@@ -58,13 +59,21 @@ import org.geppetto.frontend.messaging.DefaultMessageSenderFactory;
 import org.geppetto.frontend.messaging.MessageSender;
 import org.geppetto.frontend.messaging.MessageSenderEvent;
 import org.geppetto.frontend.messaging.MessageSenderListener;
+import org.geppetto.model.datasources.DatasourcesFactory;
+import org.geppetto.model.datasources.RunnableQuery;
+import org.geppetto.simulation.manager.ExperimentRunManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.SpringBeanAutowiringSupport;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 /**
  * Class used to process Web Socket Connections. Messages sent from the connecting clients, web socket connections, are received in here.
  * 
+ * @author matteocantarelli
+ *
  */
 public class WebsocketConnection extends MessageInbound implements MessageSenderListener
 {
@@ -84,7 +93,6 @@ public class WebsocketConnection extends MessageInbound implements MessageSender
 
 	@Autowired
 	private IGeppettoManager geppettoManager;
-
 
 	public WebsocketConnection()
 	{
@@ -117,6 +125,9 @@ public class WebsocketConnection extends MessageInbound implements MessageSender
 		messageSender = messageSenderFactory.getMessageSender(getWsOutbound(), this);
 		connectionID = ConnectionsManager.getInstance().addConnection(this);
 		sendMessage(null, OutboundMessages.CLIENT_ID, connectionID);
+
+		// User permissions are sent when socket is open
+		this.connectionHandler.checkUserPrivileges(null);
 	}
 
 	@Override
@@ -181,6 +192,11 @@ public class WebsocketConnection extends MessageInbound implements MessageSender
 				connectionHandler.getVersionNumber(requestID);
 				break;
 			}
+			case USER_PRIVILEGES:
+			{
+				connectionHandler.checkUserPrivileges(requestID);
+				break;
+			}
 			case NEW_EXPERIMENT:
 			{
 				parameters = new Gson().fromJson(gmsg.data, new TypeToken<HashMap<String, String>>()
@@ -188,6 +204,16 @@ public class WebsocketConnection extends MessageInbound implements MessageSender
 				}.getType());
 				projectId = Long.parseLong(parameters.get("projectId"));
 				connectionHandler.newExperiment(requestID, projectId);
+				break;
+			}
+			case CLONE_EXPERIMENT:
+			{
+				parameters = new Gson().fromJson(gmsg.data, new TypeToken<HashMap<String, String>>()
+				{
+				}.getType());
+				projectId = Long.parseLong(parameters.get("projectId"));
+				experimentId = Long.parseLong(parameters.get("experimentId"));
+				connectionHandler.cloneExperiment(requestID, projectId, experimentId);
 				break;
 			}
 			case LOAD_PROJECT_FROM_URL:
@@ -253,9 +279,31 @@ public class WebsocketConnection extends MessageInbound implements MessageSender
 				URL url = null;
 				try
 				{
+
 					url = URLReader.getURL(urlString);
 
 					connectionHandler.sendScriptData(requestID, url, this);
+
+				}
+				catch(MalformedURLException e)
+				{
+					sendMessage(requestID, OutboundMessages.ERROR_READING_SCRIPT, "");
+				}
+				break;
+			}
+			case GET_DATA_SOURCE_RESULTS:
+			{
+				URL url = null;
+				String dataSourceName;
+				try
+				{
+					parameters = new Gson().fromJson(gmsg.data, new TypeToken<HashMap<String, String>>()
+					{
+					}.getType());
+					url = URLReader.getURL(parameters.get("url"));
+					dataSourceName = parameters.get("data_source_name");
+
+					connectionHandler.sendDataSourceResults(requestID, dataSourceName, url, this);
 
 				}
 				catch(MalformedURLException e)
@@ -299,7 +347,7 @@ public class WebsocketConnection extends MessageInbound implements MessageSender
 				ReceivedObject receivedObject = new Gson().fromJson(gmsg.data, ReceivedObject.class);
 				try
 				{
-					connectionHandler.setWatchedVariables(requestID, receivedObject.variables, receivedObject.experimentId, receivedObject.projectId);
+					connectionHandler.setWatchedVariables(requestID, receivedObject.variables, receivedObject.experimentId, receivedObject.projectId, receivedObject.watch);
 				}
 				catch(GeppettoExecutionException e)
 				{
@@ -310,46 +358,6 @@ public class WebsocketConnection extends MessageInbound implements MessageSender
 					sendMessage(requestID, OutboundMessages.ERROR_SETTING_WATCHED_VARIABLES, "");
 				}
 
-				break;
-			}
-			case CLEAR_WATCHED_VARIABLES:
-			{
-				try
-				{
-					ReceivedObject receivedObject = new Gson().fromJson(gmsg.data, ReceivedObject.class);
-					connectionHandler.clearWatchLists(requestID, receivedObject.experimentId, receivedObject.projectId);
-				}
-				catch(GeppettoExecutionException e)
-				{
-					sendMessage(requestID, OutboundMessages.ERROR_SETTING_WATCHED_VARIABLES, "");
-				}
-				break;
-			}
-			case IDLE_USER:
-			{
-				connectionHandler.userBecameIdle(requestID);
-				break;
-			}
-			case GET_MODEL_TREE:
-			{
-				parameters = new Gson().fromJson(gmsg.data, new TypeToken<HashMap<String, String>>()
-				{
-				}.getType());
-				experimentId = Long.parseLong(parameters.get("experimentId"));
-				projectId = Long.parseLong(parameters.get("projectId"));
-				instancePath = parameters.get("instancePath");
-				connectionHandler.getModelTree(requestID, instancePath, experimentId, projectId);
-				break;
-			}
-			case GET_SIMULATION_TREE:
-			{
-				parameters = new Gson().fromJson(gmsg.data, new TypeToken<HashMap<String, String>>()
-				{
-				}.getType());
-				experimentId = Long.parseLong(parameters.get("experimentId"));
-				projectId = Long.parseLong(parameters.get("projectId"));
-				instancePath = parameters.get("instancePath");
-				connectionHandler.getSimulationTree(requestID, instancePath, experimentId, projectId);
 				break;
 			}
 			case GET_SUPPORTED_OUTPUTS:
@@ -378,7 +386,7 @@ public class WebsocketConnection extends MessageInbound implements MessageSender
 			case SET_PARAMETERS:
 			{
 				ReceivedObject receivedObject = new Gson().fromJson(gmsg.data, ReceivedObject.class);
-				connectionHandler.setParameters(requestID, receivedObject.modelAspectPath, receivedObject.modelParameters, receivedObject.projectId, receivedObject.experimentId);
+				connectionHandler.setParameters(requestID, receivedObject.modelParameters, receivedObject.projectId, receivedObject.experimentId);
 				break;
 			}
 			case LINK_DROPBOX:
@@ -436,13 +444,63 @@ public class WebsocketConnection extends MessageInbound implements MessageSender
 				break;
 			}
 			case EXPERIMENT_STATUS:
+			{
 				connectionHandler.checkExperimentStatus(requestID, gmsg.data);
 				break;
+			}
+			case FETCH_VARIABLE:
+			{
+				GeppettoModelAPIParameters receivedObject = new Gson().fromJson(gmsg.data, GeppettoModelAPIParameters.class);
+				connectionHandler.fetchVariable(requestID, receivedObject.projectId, receivedObject.dataSourceId, receivedObject.variableId);
+				break;
+			}
+			case RESOLVE_IMPORT_TYPE:
+			{
+				GeppettoModelAPIParameters receivedObject = new Gson().fromJson(gmsg.data, GeppettoModelAPIParameters.class);
+				connectionHandler.resolveImportType(requestID, receivedObject.projectId, receivedObject.paths);
+				break;
+			}
+			case RESOLVE_IMPORT_VALUE:
+			{
+				GeppettoModelAPIParameters receivedObject = new Gson().fromJson(gmsg.data, GeppettoModelAPIParameters.class);
+				connectionHandler.resolveImportValue(requestID, receivedObject.projectId, receivedObject.experimentId, receivedObject.path);
+				break;
+			}
+			case RUN_QUERY:
+			{
+				GeppettoModelAPIParameters receivedObject = new Gson().fromJson(gmsg.data, GeppettoModelAPIParameters.class);
+				connectionHandler.runQuery(requestID, receivedObject.projectId, convertRunnableQueriesDataTransferModel(receivedObject.runnableQueries));
+				break;
+			}
+			case RUN_QUERY_COUNT:
+			{
+				GeppettoModelAPIParameters receivedObject = new Gson().fromJson(gmsg.data, GeppettoModelAPIParameters.class);
+				connectionHandler.runQueryCount(requestID, receivedObject.projectId, convertRunnableQueriesDataTransferModel(receivedObject.runnableQueries));
+				break;
+			}
 			default:
 			{
 				// NOTE: no other messages expected for now
 			}
 		}
+	}
+
+	/**
+	 * @param runnableQueries
+	 * @return A list based on the EMF class. It's not possible to use directly the EMF class as Gson requires fields with public access modifiers which breaks EMF encapsulation
+	 */
+	private List<RunnableQuery> convertRunnableQueriesDataTransferModel(List<RunnableQueryDT> runnableQueries)
+	{
+		EList<RunnableQuery> runnableQueriesEMF = new BasicEList<RunnableQuery>();
+
+		for(RunnableQueryDT dt : runnableQueries)
+		{
+			RunnableQuery rqEMF = DatasourcesFactory.eINSTANCE.createRunnableQuery();
+			rqEMF.setQueryPath(dt.queryPath);
+			rqEMF.setTargetVariablePath(dt.targetVariablePath);
+			runnableQueriesEMF.add(rqEMF);
+		}
+		return runnableQueriesEMF;
 	}
 
 	/**
@@ -477,10 +535,26 @@ public class WebsocketConnection extends MessageInbound implements MessageSender
 		Long projectId;
 		Long experimentId;
 		List<String> variables;
-		String modelAspectPath;
+		boolean watch;
 		Map<String, String> modelParameters;
 		Map<String, String> properties;
 	}
 
+	class GeppettoModelAPIParameters
+	{
+		Long projectId;
+		Long experimentId;
+		String dataSourceId;
+		List<String> paths;
+		String path;
+		String variableId;
+		List<RunnableQueryDT> runnableQueries;
+	}
+
+	class RunnableQueryDT
+	{
+		String targetVariablePath;
+		String queryPath;
+	}
 
 }

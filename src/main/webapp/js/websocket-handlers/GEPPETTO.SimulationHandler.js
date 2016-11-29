@@ -33,8 +33,8 @@
 /**
  * Handles incoming messages associated with Simulation
  */
-define(function(require) {	
-	return function(GEPPETTO) {
+define(function (require) {
+    return function (GEPPETTO) {
 
         var messageTypes = {
             /*
@@ -43,422 +43,557 @@ define(function(require) {
             EXPERIMENT_UPDATE: "experiment_update",
             SIMULATION_CONFIGURATION: "project_configuration",
             PROJECT_LOADED: "project_loaded",
+            MODEL_LOADED: "geppetto_model_loaded",
             PROJECT_PROPS_SAVED: "project_props_saved",
+            EXPERIMENT_PROPS_SAVED: "experiment_props_saved",
             EXPERIMENT_CREATED: "experiment_created",
             EXPERIMENT_LOADING: "experiment_loading",
             EXPERIMENT_LOADED: "experiment_loaded",
-            PLAY_EXPERIMENT : "play_experiment",
+            VARIABLE_FETCHED: "variable_fetched",
+            IMPORT_TYPE_RESOLVED: "import_type_resolved",
+            IMPORT_VALUE_RESOLVED: "import_value_resolved",
+            PLAY_EXPERIMENT: "play_experiment",
             SET_WATCHED_VARIABLES: "set_watched_variables",
-            WATCHED_VARIABLES_SET:"watched_variables_set",
+            WATCHED_VARIABLES_SET: "watched_variables_set",
             CLEAR_WATCH: "clear_watch",
-            EXPERIMENT_OVER : "experiment_over",
-            GET_MODEL_TREE : "get_model_tree",
-            GET_SIMULATION_TREE : "get_simulation_tree",
-            SET_PARAMETERS : "set_parameters",
-            NO_FEATURE : "no_feature",
-            EXPERIMENT_STATUS : "experiment_status",
-            GET_SUPPORTED_OUTPUTS : "get_supported_outputs",
-            EXPERIMENT_DELETED : "experiment_deleted",
-            PROJECT_PERSISTED : "project_persisted",
-            DROPBOX_LINKED : "dropbox_linked",
-            DROPBOX_UNLINKED : "dropbox_unlinked",
-            RESULTS_UPLOADED : "results_uploaded",
-            MODEL_UPLOADED : "model_uploaded",
-            UPDATE_MODEL_TREE : "update_model_tree",
-            DOWNLOAD_MODEL : "download_model",
-            DOWNLOAD_RESULTS : "download_results"
+            EXPERIMENT_OVER: "experiment_over",
+            GET_MODEL_TREE: "get_model_tree",
+            GET_SIMULATION_TREE: "get_simulation_tree",
+            SET_PARAMETERS: "set_parameters",
+            NO_FEATURE: "no_feature",
+            EXPERIMENT_STATUS: "experiment_status",
+            GET_SUPPORTED_OUTPUTS: "get_supported_outputs",
+            EXPERIMENT_DELETED: "experiment_deleted",
+            PROJECT_PERSISTED: "project_persisted",
+            PROJECT_PERSISTENCE_STATE: "project_persistence_state",
+            DROPBOX_LINKED: "dropbox_linked",
+            DROPBOX_UNLINKED: "dropbox_unlinked",
+            RESULTS_UPLOADED: "results_uploaded",
+            MODEL_UPLOADED: "model_uploaded",
+            UPDATE_MODEL_TREE: "update_model_tree",
+            DOWNLOAD_MODEL: "download_model",
+            DOWNLOAD_RESULTS: "download_results"
         };
 
         var messageHandler = {};
 
-        messageHandler[messageTypes.PROJECT_LOADED] = function(payload) {        	
-            GEPPETTO.SimulationHandler.loadProject(payload);            
+        messageHandler[messageTypes.PROJECT_LOADED] = function (payload) {
+            GEPPETTO.SimulationHandler.loadProject(payload);
         };
-        
-        messageHandler[messageTypes.EXPERIMENT_CREATED] = function(payload) {     
+
+        messageHandler[messageTypes.MODEL_LOADED] = function (payload) {
+            GEPPETTO.SimulationHandler.loadModel(payload);
+        };
+
+        messageHandler[messageTypes.EXPERIMENT_CREATED] = function (payload) {
             var newExperiment = GEPPETTO.SimulationHandler.createExperiment(payload);
-            GEPPETTO.FE.newExperiment(newExperiment);
         };
-        
-        messageHandler[messageTypes.EXPERIMENT_LOADING] = function(payload) { 
-			
-        	GEPPETTO.trigger('project:show_spinner');
-        }
+        messageHandler[messageTypes.EXPERIMENT_LOADING] = function (payload) {
+            GEPPETTO.trigger(Events.Show_spinner, GEPPETTO.Resources.LOADING_EXPERIMENT);
+        };
 
-        messageHandler[messageTypes.EXPERIMENT_LOADED] = function(payload) {        	
-        	GEPPETTO.SimulationHandler.loadExperiment(payload);
-            
-			//Updates the simulation controls visibility
-			var webGLStarted = GEPPETTO.init(GEPPETTO.FE.createContainer());
-			
-			if(webGLStarted) {
-				//we call it only the first time
-				GEPPETTO.SceneController.animate();
-			}
+        messageHandler[messageTypes.EXPERIMENT_LOADED] = function (payload) {
+            GEPPETTO.SimulationHandler.loadExperiment(payload);
 
-            //Populate scene
-            GEPPETTO.SceneController.populateScene(window["Project"].runTimeTree); 
-            
             GEPPETTO.trigger(Events.Experiment_loaded);
             
-            if(window.Project.getActiveExperiment().getScript()!=undefined)
-        	{
-        		G.runScript(window.Project.getActiveExperiment().getScript());
-        	}
+            if(window.Project.getActiveExperiment()!=null || undefined){
+            	if (window.Project.getActiveExperiment().getScript() != undefined) {
+            		G.runScript(window.Project.getActiveExperiment().getScript());
+            	}
+            }
         };
-        
-        messageHandler[messageTypes.PLAY_EXPERIMENT] = function(payload) {
-            GEPPETTO.SimulationHandler.playExperiment(payload);
-        	
-        	GEPPETTO.SceneController.updateScene(window.Project.runTimeTree);
-        };
-        
-        messageHandler[messageTypes.EXPERIMENT_UPDATE] = function(payload) {
-            var updatedRunTime = JSON.parse(payload.update);
-            updateTime(updatedRunTime.time);
 
-            GEPPETTO.RuntimeTreeController.updateRuntimeTree(updatedRunTime);
-            GEPPETTO.SceneController.updateScene(window.Project.runTimeTree);            
+        messageHandler[messageTypes.VARIABLE_FETCHED] = function (payload) {
+        	GEPPETTO.trigger('spin_logo');
+            GEPPETTO.SimulationHandler.addVariableToModel(payload);
+            GEPPETTO.trigger('stop_spin_logo');
+        };
+
+        messageHandler[messageTypes.IMPORT_TYPE_RESOLVED] = function (payload) {
+        	GEPPETTO.trigger('spin_logo');
+        	GEPPETTO.SimulationHandler.swapResolvedType(payload);
+            GEPPETTO.trigger('stop_spin_logo');
         };
         
-        messageHandler[messageTypes.EXPERIMENT_STATUS] = function(payload) {
+        messageHandler[messageTypes.IMPORT_VALUE_RESOLVED] = function (payload) {
+            GEPPETTO.SimulationHandler.swapResolvedValue(payload);
+            GEPPETTO.trigger('stop_spin_logo');
+        };
+        
+        messageHandler[messageTypes.PLAY_EXPERIMENT] = function (payload) {
+
+            var experimentState = JSON.parse(payload.update);
+            var experiment = window.Project.getActiveExperiment();
+
+            GEPPETTO.ExperimentsController.updateExperiment(experiment, experimentState);
+            GEPPETTO.trigger("stop_spin_logo");
+        };
+
+        messageHandler[messageTypes.EXPERIMENT_STATUS] = function (payload) {
             var experimentStatus = JSON.parse(payload.update);
 
             var experiments = window.Project.getExperiments();
-            for(var key in experimentStatus){
-            	var projectID = experimentStatus[key].projectID;
-            	var status = experimentStatus[key].status;
-            	var experimentID = experimentStatus[key].experimentID;
-            	
-            	//changing status in matched experiment
-            	for(var e in experiments){
-            		if(experiments[e].getId()==experimentID){
-            			if(experiments[e].getStatus()!=status){
-            				if(window.Project.getActiveExperiment()!=null || undefined){
-            					if(window.Project.getActiveExperiment().getId()==experimentID){
-            						if(experiments[e].getStatus()==GEPPETTO.Resources.ExperimentStatus.RUNNING&&
-            								status == GEPPETTO.Resources.ExperimentStatus.COMPLETED){
-            							GEPPETTO.trigger(Events.Experiment_completed);
-            						}
-            					}
-            				}
-            				experiments[e].setStatus(status);
-            			}
-            		}
-            	}
-            }            
+            for (var key in experimentStatus) {
+                var projectID = experimentStatus[key].projectID;
+                var status = experimentStatus[key].status;
+                var experimentID = experimentStatus[key].experimentID;
+
+                //changing status in matched experiment
+                for (var e in experiments) {
+                    if (experiments[e].getId() == experimentID) {
+                        if (experiments[e].getStatus() != status) {
+                            if (window.Project.getActiveExperiment() != null || undefined) {
+                                if (window.Project.getActiveExperiment().getId() == experimentID) {
+                                    if (experiments[e].getStatus() == GEPPETTO.Resources.ExperimentStatus.RUNNING &&
+                                        status == GEPPETTO.Resources.ExperimentStatus.COMPLETED) {
+                                        GEPPETTO.trigger(Events.Experiment_completed, experimentID);
+                                    }
+                                    if (status == GEPPETTO.Resources.ExperimentStatus.ERROR) {
+                                            GEPPETTO.trigger(Events.Experiment_failed, experimentID);
+                                     }
+                                }
+                            }
+                            experiments[e].setStatus(status);
+                        }
+                    }
+                }
+            }
             GEPPETTO.trigger(Events.Experiment_status_check);
         };
-        
-        messageHandler[messageTypes.PROJECT_PERSISTED] = function(payload) {
-            GEPPETTO.SimulationHandler.persistProject(payload);      
+
+        messageHandler[messageTypes.PROJECT_PERSISTED] = function (payload) {
+            GEPPETTO.SimulationHandler.persistProject(payload);
+            GEPPETTO.trigger("stop_spin_persist");
         };
 
-        messageHandler[messageTypes.PROJECT_CONFIGURATION] = function(payload) {            
+        messageHandler[messageTypes.PROJECT_CONFIGURATION] = function (payload) {
             GEPPETTO.trigger('project:configloaded', payload.configuration);
 
         };
 
-       
-        messageHandler[messageTypes.EXPERIMENT_DELETED] = function(payload) {
+        messageHandler[messageTypes.EXPERIMENT_DELETED] = function (payload) {
             GEPPETTO.SimulationHandler.deleteExperiment(payload);
         };
 
-        messageHandler[messageTypes.WATCHED_VARIABLES_SET] = function(payload) {
+        messageHandler[messageTypes.WATCHED_VARIABLES_SET] = function (payload) {
+            GEPPETTO.trigger(Events.Experiment_updated);
             GEPPETTO.Console.log("The list of variables to watch was successfully updated.");
         };
-        
-        
-      //handles the case where service doesn't support feature and shows message
-        messageHandler[messageTypes.NO_FEATURE] = function() {
+
+        //handles the case where service doesn't support feature and shows message
+        messageHandler[messageTypes.NO_FEATURE] = function () {
             //Updates the simulation controls visibility
-        	GEPPETTO.FE.infoDialog(GEPPETTO.Resources.NO_FEATURE, payload.message);
+            GEPPETTO.FE.infoDialog(GEPPETTO.Resources.NO_FEATURE, payload.message);
         };
-        
+
         //received model tree from server
-        messageHandler[messageTypes.GET_MODEL_TREE] = function(payload) {
-        	GEPPETTO.SimulationHandler.getModelTree(payload);
+        messageHandler[messageTypes.UPDATE_MODEL_TREE] = function (payload) {
+            GEPPETTO.trigger(Events.Experiment_updated);
+            GEPPETTO.Console.log("The model parameters were successfully updated.");
+
         };
-        
-      //received model tree from server
-        messageHandler[messageTypes.UPDATE_MODEL_TREE] = function(payload) {        	
-       	 	GEPPETTO.Console.log("The model parameters were successfully updated.");
-        	
-        	/*Matteo: This is not needed, the value in the nodes is changed right when calling setValue on them.
-        	 * This would be needed in case setParameter was used directly
-        	 * var update = JSON.parse(payload.update_model_tree);      
-        	for (var updateIndex in update){
-        		//retrieve aspect path and modeltree
-	        	var aspectInstancePath = update[updateIndex].aspectInstancePath;
-	        	var modelTree = update[updateIndex].ModelTree;
-	        	//get parameters sent for active experiment
-	        	var parameters = Project.getActiveExperiment().parameters;
-	        	for(var key in parameters){;
-	        		//find client node for parameter
-	        		var node = eval(parameters[key]);
-	        		//get name of node
-	        		var name = node.getId();
-	        		//get new server node from model tree
-	        		var newNode = eval("modelTree."+name);
-	        		//apply to client node new value
-	        		node.setValue(newNode.value);
-	        	}
-        	}*/
-        	
-        };
-        
+
         //received supported outputs from server
-        messageHandler[messageTypes.GET_SUPPORTED_OUTPUTS] = function(payload) {
-        	var supportedOutputs = JSON.parse(payload.get_supported_outputs);
-        	GEPPETTO.Console.log(supportedOutputs);
+        messageHandler[messageTypes.GET_SUPPORTED_OUTPUTS] = function (payload) {
+            var supportedOutputs = JSON.parse(payload.get_supported_outputs);
+            GEPPETTO.Console.log(supportedOutputs);
+        };
+
+        messageHandler[messageTypes.PROJECT_PROPS_SAVED] = function (payload) {
+            GEPPETTO.Console.log("Project saved succesfully");
         };
         
-        messageHandler[messageTypes.GET_SIMULATION_TREE] = function(payload) {
-        	GEPPETTO.SimulationHandler.getSimulationTree(payload);
+        messageHandler[messageTypes.EXPERIMENT_PROPS_SAVED] = function (payload) {
+            GEPPETTO.Console.log("Experiment saved succesfully");
+            var data = JSON.parse(payload.update);
+            var experiment = window.Project.getExperimentById(data.id);
+            
+            //Updates status. Used for when experiment failed, and user modified the parameters 
+            //right after, the status changes back to DESIGN from ERROR
+            if(experiment.getStatus() != data.status){
+                experiment.setStatus(data.status);
+            }
         };
-        
-        messageHandler[messageTypes.PROJECT_PROPS_SAVED] = function(payload) {
-        	GEPPETTO.Console.log("Project saved succesfully");
+
+        messageHandler[messageTypes.DROPBOX_LINKED] = function (payload) {
+            GEPPETTO.Console.log("Dropbox linked successfully");
         };
-        
-        messageHandler[messageTypes.DROPBOX_LINKED] = function(payload) {
-        	GEPPETTO.Console.log("Dropbox linked successfully");
+
+        messageHandler[messageTypes.DROPBOX_UNLINKED] = function (payload) {
+            GEPPETTO.Console.log("Dropbox unlinked succesfully");
         };
-        
-        messageHandler[messageTypes.DROPBOX_UNLINKED] = function(payload) {
-        	GEPPETTO.Console.log("Dropbox unlinked succesfully");
+
+        messageHandler[messageTypes.DOWNLOAD_RESULTS] = function (payload) {
+            GEPPETTO.Console.log("Results downloaded succesfully");
         };
-        
-        messageHandler[messageTypes.DOWNLOAD_RESULTS] = function(payload) {
-        	GEPPETTO.Console.log("Results downloaded succesfully");
+
+        messageHandler[messageTypes.DOWNLOAD_MODEL] = function (payload) {
+            GEPPETTO.Console.log("Model downloaded succesfully");
         };
-        messageHandler[messageTypes.DOWNLOAD_MODEL] = function(payload) {
-        	GEPPETTO.Console.log("Model downloaded succesfully");
+
+        messageHandler[messageTypes.RESULTS_UPLOADED] = function (payload) {
+            GEPPETTO.Console.log("Results uploaded succesfully");
         };
-        messageHandler[messageTypes.RESULTS_UPLOADED] = function(payload) {
-        	GEPPETTO.Console.log("Results uploaded succesfully");
+
+        messageHandler[messageTypes.MODEL_UPLOADED] = function (payload) {
+            GEPPETTO.Console.log("Model uploaded succesfully");
         };
-        messageHandler[messageTypes.MODEL_UPLOADED] = function(payload) {
-        	GEPPETTO.Console.log("Model uploaded succesfully");
-        };
-		GEPPETTO.SimulationHandler = {
-			onMessage: function(parsedServerMessage) {
-				// parsed message has a type and data fields - data contains the payload of the message
-				// Switch based on parsed incoming message type
-                if(messageHandler.hasOwnProperty(parsedServerMessage.type)) {
+
+        GEPPETTO.SimulationHandler = {
+            onMessage: function (parsedServerMessage) {
+                // parsed message has a type and data fields - data contains the payload of the message
+                // Switch based on parsed incoming message type
+                if (messageHandler.hasOwnProperty(parsedServerMessage.type)) {
                     messageHandler[parsedServerMessage.type](JSON.parse(parsedServerMessage.data));
                 }
-			},
-			
-			persistProject : function(payload){
-				var message = JSON.parse(payload.update);
-	            var projectID = message.projectID;
-	            var activeExperimentID = message.activeExperimentID;
-	            
-	            window.Project.id=parseInt(projectID);
-	            var oldActiveExperiment=window.Project.getActiveExperiment().id;
-	            window.Project.getActiveExperiment().id=parseInt(activeExperimentID);
-	            window.Project.persisted=true;
-	            
-	            GEPPETTO.FE.updateExperimentId(oldActiveExperiment,window.Project.getActiveExperiment().id);
-	            
-	            GEPPETTO.trigger(Events.Project_persisted);
-	            GEPPETTO.Console.log("The project has been persisted  [id="+ projectID + "].");  
-			},
-			
-			loadProject : function(payload){
-				//we remove anything from any previous loaded project if there was one
-				if(Project)
-				{
-					Project.initialize();
-				}
-				GEPPETTO.G.listeners=[];
-				var project = JSON.parse(payload.project_loaded);
-				window.Project = GEPPETTO.NodeFactory.createProjectNode(project);         
-				if(window.location.search.indexOf("load_project_from_url")!=-1)
-				{	
-					window.Project.persisted=false;
-				}
-				GEPPETTO.Init.initEventListeners();
-				GEPPETTO.trigger(Events.Project_loaded);
-	            GEPPETTO.Console.log(GEPPETTO.Resources.PROJECT_LOADED);
-			},
+            },
 
-			loadExperiment : function(payload){
-				var message=JSON.parse(payload.experiment_loaded);
-				var jsonRuntimeTree = message.scene;
-				var experimentId=message.experimentId;
+            persistProject: function (payload) {
+                var message = JSON.parse(payload.update);
+                var projectID = message.projectID;
+                var activeExperimentID = message.activeExperimentID;
 
-				//Keep going with load of simulation only if webgl container was created
-				for(var experiment in window.Project.getExperiments())
-				{
-					if(window.Project.getExperiments()[experiment].getId()==experimentId)
-					{
-						window.Project.setActiveExperiment(window.Project.getExperiments()[experiment]);
-						break;
-					}
-				}
+                window.Project.id = parseInt(projectID);
+                if(window.Project.getActiveExperiment()!=null || undefined){
+                	var oldActiveExperiment = window.Project.getActiveExperiment().id;
+                	window.Project.getActiveExperiment().id = parseInt(activeExperimentID);
+                }
+                window.Project.persisted = true;
 
-            	var startCreation = new Date();
-            	GEPPETTO.SceneController.complexity=0;
-				GEPPETTO.SceneController.computeComplexity(jsonRuntimeTree);
-            	GEPPETTO.RuntimeTreeController.createRuntimeTree(jsonRuntimeTree);
-            
-            	var endCreation = new Date() - startCreation;
-            	GEPPETTO.Console.debugLog("It took " + endCreation + " ms to create runtime tree");
-	            GEPPETTO.Console.debugLog(GEPPETTO.NodeFactory.nodes + " total nodes created, from which: "+
-            						  GEPPETTO.NodeFactory.entities + " were entities and "+
-            						  GEPPETTO.NodeFactory.connections + " were connections");
+                GEPPETTO.trigger(Events.Project_persisted);
+                GEPPETTO.Console.log("The project has been persisted  [id=" + projectID + "].");
+            },
 
-			},
-			
-			createExperiment : function(payload){
-				var experiment = JSON.parse(payload.experiment_created);
-
-	            var newExperiment = GEPPETTO.NodeFactory.createExperimentNode(experiment);
-	            window.Project.getExperiments().push(newExperiment);
-	            newExperiment.setParent(window.Project);
-	            GEPPETTO.Console.log(GEPPETTO.Resources.EXPERIMENT_CREATED);
-	            
-	            return newExperiment;
-			},
-			
-			playExperiment : function(payload){
-				var updatedRunTime = JSON.parse(payload.update);
+            loadProject: function (payload) {
+                // we remove anything from any previous loaded project if there was one
+                if (Project) {
+                    Project.initialize();
+                }
+                GEPPETTO.G.listeners = [];
+                var update = JSON.parse(payload.project_loaded);
+                var project = update.project;
+                var persisted = update.persisted;
+                window.Project = GEPPETTO.ProjectFactory.createProjectNode(project, persisted);
                 
-	            GEPPETTO.RuntimeTreeController.updateRuntimeTree(updatedRunTime);
+                GEPPETTO.Init.initEventListeners();
+                GEPPETTO.trigger(Events.Project_loaded);
+                GEPPETTO.Console.log(GEPPETTO.Resources.PROJECT_LOADED);
+            },
 
-	        	var experiment = window.Project.getActiveExperiment();
-	        	//we loop through variables of experiment to find node with 
-	        	//max number of time series values, this will be used for knowing
-	        	//when to stop updating experiment
-	        	var variables = experiment.getVariables();
-	        	var maxSteps = 0;
-	        	for(var key in variables){
-	        		var node = eval(variables[key]);
-	        		if(node!=null && node != undefined && node._metaType==GEPPETTO.Resources.VARIABLE_NODE){
-	        			if(node.getTimeSeries().length>maxSteps){
-	        				maxSteps = node.getTimeSeries().length;
-	        			}
-	        		}
-	        	}
-	        	experiment.maxSteps = maxSteps;
-	        	
-	        	if(!experiment.played){
-	        		experiment.experimentUpdateWorker();
-	        	}
-	        	experiment.played = true;
-			},
-			
-			deleteExperiment : function(payload){
-				var data = JSON.parse(payload.update);
+            loadModel: function (payload) {
 
-	            var experiments = window.Project.getExperiments();
-	            for(var e in experiments){
-	            	var experiment = experiments[e];
-	            	if(experiment.getId() == data.id){
-	            		var index = window.Project.getExperiments().indexOf(experiment);
-	            		window.Project.getExperiments().splice(index,1);
-	            	}
-	            }
-	        	var parameters = {name : data.name, id : data.id};
-	            GEPPETTO.trigger(Events.Experiment_deleted, parameters);
-			},
-			
-			getModelTree : function(payload){
-				var initTime = new Date();
-	        	
-	        	GEPPETTO.Console.debugLog(GEPPETTO.Resources.LOADING_MODEL + " took: " + initTime + "ms.");
-	        	
-	        	var update = JSON.parse(payload.get_model_tree);      
-	        	for (var updateIndex in update){
-		        	var aspectInstancePath = update[updateIndex].aspectInstancePath;
-		        	var modelTree = update[updateIndex].ModelTree;
-		        	
-		        	//create client side model tree
-		        	GEPPETTO.RuntimeTreeController.populateAspectModelTree(aspectInstancePath, modelTree);
-	        	}
-	        	
-	        	GEPPETTO.trigger(Events.ModelTree_populated);
-	        	
-	        	var endCreation = new Date() - initTime;
-	            GEPPETTO.Console.debugLog("It took " + endCreation + "ms to create model tree");
-			},
-			
-			getSimulationTree : function(payload){
-				var initTime = new Date();
-	        	
-	            GEPPETTO.Console.debugLog(GEPPETTO.Resources.LOADING_MODEL + " took: " + initTime + " ms.");
-	           
-	        	var update = JSON.parse(payload.get_simulation_tree);      
-	        	for (var updateIndex in update){
-		        	var aspectInstancePath = update[updateIndex].aspectInstancePath;
-		        	var simulationTree = update[updateIndex].SimulationTree;
-		        	
-		        	//create client side simulation tree
-		        	GEPPETTO.RuntimeTreeController.populateAspectSimulationTree(aspectInstancePath, simulationTree);
-	        	}
-	        	
-				GEPPETTO.Console.log(GEPPETTO.Resources.SIMULATION_TREE_RECEIVED);
-	        	GEPPETTO.trigger(Events.SimulationTree_populated);
-	        	var endCreation = new Date() - initTime;
-	            GEPPETTO.Console.debugLog("It took " + endCreation + "ms to create simulation tree");
-			},
-		};
+                console.time(GEPPETTO.Resources.PARSING_MODEL);
+                GEPPETTO.trigger(Events.Show_spinner, GEPPETTO.Resources.PARSING_MODEL);
 
-		GEPPETTO.SimulationHandler.MESSAGE_TYPE = messageTypes;
-	};
+                var model = JSON.parse(payload.geppetto_model_loaded);
 
-	/**
-	 * Utility function for formatting output of list variable operations
-	 * NOTE: move from here under wherever it makes sense
-	 *
-	 * @param vars - array of variables
-	 */
-	function formatListVariableOutput(vars, indent)
-	{
-		var formattedNode = null;
+                console.timeEnd(GEPPETTO.Resources.PARSING_MODEL);
 
-		// vars is always an array of variables
-		for(var i = 0; i < vars.length; i++) {
-			var name = vars[i].name;
+                console.time(GEPPETTO.Resources.CREATING_MODEL);
+                GEPPETTO.trigger(Events.Show_spinner, GEPPETTO.Resources.CREATING_MODEL);
+                // build Geppetto model here (once off operation when project is loaded)
+                window.Model = GEPPETTO.ModelFactory.createGeppettoModel(model, true, true);
+                console.timeEnd(GEPPETTO.Resources.CREATING_MODEL);
 
-			if(vars[i].aspect != "aspect") {
-				var size = null;
-				if(typeof(vars[i].size) != "undefined") {
-					// we know it's an array
-					size = vars[i].size;
-				}
+                console.time(GEPPETTO.Resources.CREATING_INSTANCES);
+                GEPPETTO.trigger(Events.Show_spinner, GEPPETTO.Resources.CREATING_INSTANCES);
+                // build instance tree here (instance tree will be populated with state info for each experiment)
+                window.Instances = GEPPETTO.ModelFactory.createInstances(window.Model);
+                this.augmentInstancesArray(window.Instances);
+                console.timeEnd(GEPPETTO.Resources.CREATING_INSTANCES);
 
-				// print node
-				var arrayPart = (size != null) ? "[" + size + "]" : "";
-				var indentation = "   ���";
-				for(var j = 0; j < indent; j++) {
-					indentation = indentation.replace("���", " ") + "   ��� ";
-				}
-				formattedNode = indentation + name + arrayPart;
+                console.time(GEPPETTO.Resources.CREATING_SCENE);
+                GEPPETTO.trigger(Events.Show_spinner, GEPPETTO.Resources.CREATING_SCENE);
+                // build scene here from Geppetto model populating visual objects in the instance tree
+                // Updates the simulation controls visibility
+                var webGLStarted = GEPPETTO.init(GEPPETTO.FE.createContainer());
 
-				// is type simple variable? print type
-				if(typeof(vars[i].type.variables) == "undefined") {
-					// we know it's a simple type
-					var type = vars[i].type.type;
-					formattedNode += ":" + type;
-				}
+                if (webGLStarted) {
+                    // we call it only the first time
+                    GEPPETTO.SceneController.animate();
+                }
+                GEPPETTO.SceneController.buildScene(window.Instances, window.Model);
+                console.timeEnd(GEPPETTO.Resources.CREATING_SCENE);
+                GEPPETTO.trigger(Events.Model_loaded);
+                GEPPETTO.Console.log(GEPPETTO.Resources.MODEL_LOADED);
 
-				// print current node
-				GEPPETTO.Console.log(formattedNode);
+                // populate control panel with instances
+                GEPPETTO.trigger(Events.Instances_created, window.Instances);
 
-				// recursion check
-				if(typeof(vars[i].type.variables) != "undefined") {
-					// we know it's a complex type - recurse! recurse!
-					formatListVariableOutput(vars[i].type.variables, indent + 1);
-				}
-			}
-			else {
-				formattedNode = name;
-				// print current node
-				GEPPETTO.Console.log(formattedNode);
-			}
-		}
-	}
+                console.timeEnd(GEPPETTO.Resources.LOADING_PROJECT);
+                GEPPETTO.trigger(Events.Hide_spinner);
+            },
+
+            /**
+             * Fetch variable
+             *
+             * @param variableId
+             * @param datasourceId
+             */
+            fetchVariable: function (variableId, datasourceId, callback) {
+                if (!window.Model.hasOwnProperty(variableId)) {
+                    var params = {};
+                    params["projectId"] = Project.getId();
+                    params["variableId"] = variableId;
+                    params["dataSourceId"] = datasourceId;
+
+                    var requestID = GEPPETTO.MessageSocket.send("fetch_variable", params, callback);
+
+                    GEPPETTO.trigger('spin_logo');
+
+                } else {
+                    GEPPETTO.Console.log(GEPPETTO.Resources.VARIABLE_ALREADY_EXISTS);
+                    // the variable already exists, run the callback
+                    callback();
+                }
+            },
+
+            /**
+             * Adds fetched variable to model
+             *
+             * @param payload
+             */
+            addVariableToModel: function (payload) {
+                var rawModel = JSON.parse(payload.variable_fetched);
+
+                console.time(GEPPETTO.Resources.ADDING_VARIABLE);
+
+                // STEP 1: merge model - expect a fully formed Geppetto model to be merged into current one
+                var diffReport = GEPPETTO.ModelFactory.mergeModel(rawModel);
+
+                // STEP 2: add new instances for new variables if any
+                var newInstances = GEPPETTO.ModelFactory.createInstancesFromDiffReport(diffReport);
+
+                // STEP: 3 update scene
+                GEPPETTO.SceneController.updateSceneWithNewInstances(newInstances);
+
+                // STEP: 4 update components
+                GEPPETTO.trigger(Events.Instances_created, newInstances);
+
+                console.timeEnd(GEPPETTO.Resources.ADDING_VARIABLE);
+
+                GEPPETTO.Console.log(GEPPETTO.Resources.VARIABLE_ADDED);
+            },
+
+            /**
+             * Resolve import type
+             *
+             * @param typePath
+             */
+            resolveImportType: function (typePaths, callback) {
+                if(typeof typePaths == "string"){
+                    typePaths=[typePaths];
+                }
+                var params = {};
+                params["projectId"] = Project.getId();
+                // replace client naming first occurrence - the server doesn't know about it
+                var paths=[];
+                for(var i=0;i<typePaths.length;i++){
+                    paths.push(typePaths[i].replace(GEPPETTO.Resources.MODEL_PREFIX_CLIENT+".", ''));
+                }
+                params["paths"] = paths;
+
+                var requestID = GEPPETTO.MessageSocket.send("resolve_import_type", params, callback);
+
+                GEPPETTO.trigger('spin_logo');
+            },
+
+            /**
+             * Swap resolved import type with actual type
+             *
+             * @param payload
+             */
+            swapResolvedType: function (payload) {
+            	console.time(GEPPETTO.Resources.IMPORT_TYPE_RESOLVED);
+                var rawModel = JSON.parse(payload.import_type_resolved);
+
+                // STEP 1: merge model - expect a fully formed Geppetto model to be merged into current one
+                var diffReport = GEPPETTO.ModelFactory.mergeModel(rawModel, true);
+
+                // STEP 2: add new instances for new types if any
+                var newInstances = GEPPETTO.ModelFactory.createInstancesFromDiffReport(diffReport);
+
+                // STEP 3: update scene
+                GEPPETTO.SceneController.updateSceneWithNewInstances(newInstances);
+
+                // STEP: 4 update components
+                GEPPETTO.trigger(Events.Instances_created, newInstances);
+
+                console.timeEnd(GEPPETTO.Resources.IMPORT_TYPE_RESOLVED);
+                GEPPETTO.Console.log(GEPPETTO.Resources.IMPORT_TYPE_RESOLVED);
+            },
+            
+            resolveImportValue: function (typePath, callback) {
+                var params = {};
+                params["experimentId"] = Project.getActiveExperiment().getId();
+                params["projectId"] = Project.getId();
+                // replace client naming first occurrence - the server doesn't know about it
+                params["path"] = typePath.replace(GEPPETTO.Resources.MODEL_PREFIX_CLIENT+".", '');
+
+                var requestID = GEPPETTO.MessageSocket.send("resolve_import_value", params, callback);
+
+                GEPPETTO.trigger('spin_logo');
+            },
+
+            /**
+             * Swap resolved import value with actual type
+             *
+             * @param payload
+             */
+            swapResolvedValue: function (payload) {
+                var rawModel = JSON.parse(payload.import_value_resolved);
+
+                // STEP 1: merge model - expect a fully formed Geppetto model to be merged into current one
+                var diffReport = GEPPETTO.ModelFactory.mergeValue(rawModel, true);
+
+                GEPPETTO.Console.log(GEPPETTO.Resources.IMPORT_VALUE_RESOLVED);
+            },
+            /**
+             * Augments the instances array with some utilities methods for ease of access
+             */
+            augmentInstancesArray: function (instances) {
+                // create global shortcuts to top level instances
+                for (var i = 0; i < instances.length; i++) {
+                    // NOTE: tampering with the window object like this is probably a horrible idea
+                    window[instances[i].getId()] = instances[i];
+                    window.Instances[instances[i].getId()] = instances[i];
+                }
+
+                // add method to add instances to window.Instances
+                instances.addInstances = function (instancePaths) {
+                    if (!(instancePaths.constructor === Array)) {
+                        // if it's not an array throw it into an array with a single element
+                        instancePaths = [instancePaths];
+                    }
+
+                    GEPPETTO.ModelFactory.addInstances(instancePaths, window.Instances, window.Model);
+                };
+
+                instances.getInstance = function (instancePath, create) {
+                    if (create == undefined) {
+                        create = true;
+                    }
+
+                    var instances = [];
+                    var InstanceVarName = "Instances.";
+                    var arrayParameter = true;
+
+                    if (!(instancePath.constructor === Array)) {
+                        instancePath = [instancePath];
+                        arrayParameter = false;
+                    }
+
+                    // check if we have any [*] for array notation and replace with exploded paths
+                    for (var j = 0; j < instancePath.length; j++) {
+                        if (instancePath[j].indexOf('[*]') > -1) {
+                            var arrayPath = instancePath[j].substring(0, instancePath[j].indexOf('['));
+                            var subArrayPath = instancePath[j].substring(instancePath[j].indexOf(']') + 1, instancePath[j].length);
+                            var arrayInstance = Instances.getInstance(arrayPath);
+                            var arraySize = arrayInstance.getSize();
+
+                            // remove original * entry
+                            instancePath.splice(j, 1);
+                            // add exploded elements
+                            for (var x = 0; x < arraySize; x++) {
+                                instancePath.push(arrayPath + '[' + x + ']' + subArrayPath);
+                            }
+                        }
+                    }
+
+
+                    for (var i = 0; i < instancePath.length; i++) {
+                        try {
+                            instances[i] = eval(InstanceVarName + instancePath[i]);
+                            if (instances[i] == undefined) {
+                                if (create) {
+                                    Instances.addInstances(instancePath[i]);
+                                    instances[i] = eval(InstanceVarName + instancePath[i]);
+                                }
+                            }
+                        } catch (e) {
+                            if (create) {
+                                Instances.addInstances(instancePath[i]);
+                                instances[i] = eval(InstanceVarName + instancePath[i]);
+                            }
+                        }
+                        if (instances[i] == undefined && create) {
+                            throw( "The instance " + instancePath[i] + " does not exist in the current model" );
+                        }
+                    }
+
+                    if (instances.length == 1 && !arrayParameter) {
+                        //if we received an array we want to return an array even if there's only one element
+                        return instances[0];
+                    } else {
+                        return instances;
+                    }
+                };
+            },
+
+            loadExperiment: function (payload) {
+                console.time(GEPPETTO.Resources.LOADING_EXPERIMENT);
+
+                var message = JSON.parse(payload.experiment_loaded);
+
+                var experimentId = message.experimentId;
+                var experiment = undefined;
+
+                for (var e in window.Project.getExperiments()) {
+                    if (window.Project.getExperiments()[e].getId() == experimentId) {
+                        experiment = window.Project.getExperiments()[e];
+                        break;
+                    }
+                }
+
+                if (experiment == undefined) {
+                    throw ("Could not find the experiment with id " + experimentId);
+                }
+
+                GEPPETTO.Console.createTags("Project.getActiveExperiment()", GEPPETTO.Utility.extractMethodsFromObject(experiment, true));
+
+                window.Project.setActiveExperiment(experiment);
+                GEPPETTO.ExperimentsController.updateExperiment(experiment, message);
+                console.timeEnd(GEPPETTO.Resources.LOADING_EXPERIMENT);
+            },
+
+            createExperiment: function (payload) {
+                var experiment = JSON.parse(payload.experiment_created);
+
+                var newExperiment = GEPPETTO.ProjectFactory.createExperimentNode(experiment);
+                window.Project.getExperiments().push(newExperiment);
+                newExperiment.setParent(window.Project);
+                newExperiment.setActive();
+                GEPPETTO.Console.log(GEPPETTO.Resources.EXPERIMENT_CREATED);
+                
+                GEPPETTO.trigger(Events.Experiment_created, newExperiment);
+
+                return newExperiment;
+            },
+
+            deleteExperiment: function (payload) {
+                var data = JSON.parse(payload.update);
+                var experiment = null;
+                var experiments = window.Project.getExperiments();
+                for (var e in experiments) {
+                    if (experiments[e].getId() == data.id) {
+                    	experiment = experiments[e];
+                        var index = window.Project.getExperiments().indexOf(experiment);
+                        window.Project.getExperiments().splice(index, 1);
+                    }
+                }
+                var activeExperiment = window.Project.getActiveExperiment();
+            	if(activeExperiment!=null || undefined){
+            		if(activeExperiment.getId()==experiment.getId()){
+            			window.Project.activeExperiment = null;
+            		}
+            	}
+                GEPPETTO.trigger(Events.Experiment_deleted, experiment);
+            }
+        };
+
+        GEPPETTO.SimulationHandler.MESSAGE_TYPE = messageTypes;
+    };
+
+    
 });

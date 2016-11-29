@@ -1,5 +1,10 @@
 package org.geppetto.frontend.controllers;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URL;
+
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 
@@ -8,12 +13,20 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
 import org.geppetto.core.auth.IAuthService;
+import org.geppetto.core.common.GeppettoExecutionException;
 import org.geppetto.core.common.GeppettoInitializationException;
+import org.geppetto.core.data.DefaultGeppettoDataManager;
 import org.geppetto.core.manager.IGeppettoManager;
+import org.geppetto.core.utilities.URLReader;
+import org.geppetto.frontend.tests.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.google.gson.Gson;
 
 @Controller
 public class Application
@@ -36,6 +49,17 @@ public class Application
 			{
 				// Default no persistence, no users
 				auth = true;
+				if(geppettoManager.getUser()==null)
+				{
+					try
+					{
+						geppettoManager.setUser(DefaultGeppettoDataManager.getGuestUser());
+					}
+					catch(GeppettoExecutionException e)
+					{
+						logger.error(e);
+					}
+				}
 			}
 			else if(geppettoManager.getUser() != null)
 			{
@@ -74,16 +98,30 @@ public class Application
 		return "redirect:http://geppetto.org";
 	}
 
+	@RequestMapping(value = "/geppettotestingprojects", method = RequestMethod.GET)
+	public @ResponseBody Test getTestingProjects(@RequestParam String url) throws IOException
+	{
+		URL resource = URLReader.getURL(url);
+		BufferedReader reader = new BufferedReader(new InputStreamReader(resource.openStream()));
+		return new Gson().fromJson(reader, Test.class);
+	}
+	
 	@RequestMapping(value = "/GeppettoNeuronalTests.html", method = RequestMethod.GET)
 	public String testNeuronal()
 	{
 		return "dist/GeppettoNeuronalTests";
 	}
 	
-	@RequestMapping(value = "/GeppettoNeuronalSimulationTests.html", method = RequestMethod.GET)
-	public String testNeuronalSimulation()
+	@RequestMapping(value = "/GeppettoNeuronalCustomTests.html", method = RequestMethod.GET)
+	public String testNeuronalCustom()
 	{
-		return "dist/GeppettoNeuronalSimulationTests";
+		return "dist/GeppettoNeuronalCustomTests";
+	}
+	
+	@RequestMapping(value = "/GeppettoComponentsTests.html", method = RequestMethod.GET)
+	public String testComponents()
+	{
+		return "dist/GeppettoComponentsTests";
 	}
 	
 	@RequestMapping(value = "/GeppettoCoreTests.html", method = RequestMethod.GET)
@@ -92,10 +130,22 @@ public class Application
 		return "dist/GeppettoCoreTests";
 	}
 	
+	@RequestMapping(value = "/GeppettoExternalSimulatorTests.html", method = RequestMethod.GET)
+	public String testExternalSimulator()
+	{
+		return "dist/GeppettoExternalSimulatorTests";
+	}
+	
 	@RequestMapping(value = "/GeppettoPersistenceTests.html", method = RequestMethod.GET)
 	public String testPersistence()
 	{
 		return "dist/GeppettoPersistenceTests";
+	}
+	
+	@RequestMapping(value = "/GeppettoPersistenceTests-alt.html", method = RequestMethod.GET)
+	public String testAltPersistence()
+	{
+		return "dist/GeppettoPersistenceTests-alt";
 	}
 	
 	@RequestMapping(value = "/GeppettoFluidDynamicsTests.html", method = RequestMethod.GET)
@@ -113,7 +163,7 @@ public class Application
 	@RequestMapping(value = "/tests.html", method = RequestMethod.GET)
 	public String tests()
 	{
-		return "dist/Tests";
+		return "dist/tests";
 	}
 	
 	@RequestMapping(value = "/", method = RequestMethod.GET)

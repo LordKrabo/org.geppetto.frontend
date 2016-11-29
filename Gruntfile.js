@@ -28,16 +28,29 @@ module.exports = function(grunt) {
             dist: {
                 files: {
                     'src/main/webapp/templates/dist/geppetto.vm': ['src/main/webapp/templates/geppetto.vm'],
-                    'src/main/webapp/templates/dist/geppettotests.vm': ['src/main/webapp/templates/geppettotests.vm'],
                     'src/main/webapp/templates/dist/dashboard.vm': ['src/main/webapp/templates/dashboard.vm'],
-                    'src/main/webapp/WEB-INF/web.xml': ['src/main/webapp/WEB-INF/web.xml']
+                    'src/main/webapp/WEB-INF/web.xml': ['src/main/webapp/WEB-INF/web.xml'],
+                    'src/main/webapp/templates/dist/GeppettoCoreTests.vm': ['src/main/webapp/templates/GeppettoCoreTests.vm'],
+                    'src/main/webapp/templates/dist/GeppettoComponentsTests.vm': ['src/main/webapp/templates/GeppettoComponentsTests.vm'],
+                    'src/main/webapp/templates/dist/GeppettoFluidDynamicsTests.vm': ['src/main/webapp/templates/GeppettoFluidDynamicsTests.vm'],
+                    'src/main/webapp/templates/dist/GeppettoNeuronalCustomTests.vm': ['src/main/webapp/templates/GeppettoNeuronalCustomTests.vm'],
+                    'src/main/webapp/templates/dist/GeppettoNeuronalTests.vm': ['src/main/webapp/templates/GeppettoNeuronalTests.vm'],
+                    'src/main/webapp/templates/dist/GeppettoPersistenceTests.vm': ['src/main/webapp/templates/GeppettoPersistenceTests.vm'],
+					'src/main/webapp/templates/dist/GeppettoPersistenceTests-alt.vm': ['src/main/webapp/templates/GeppettoPersistenceTests-alt.vm'],
+                    'src/main/webapp/templates/dist/GeppettoExternalSimulatorTests.vm': ['src/main/webapp/templates/GeppettoExternalSimulatorTests.vm']
                 }
             },
             dev: {
                 files: {
                     'src/main/webapp/templates/dist/geppetto.vm': ['src/main/webapp/templates/geppetto.vm'],
                     'src/main/webapp/templates/dist/dashboard.vm': ['src/main/webapp/templates/dashboard.vm'],
-                    'src/main/webapp/templates/dist/geppettotests.vm': ['src/main/webapp/templates/geppettotests.vm']
+                    'src/main/webapp/templates/dist/GeppettoCoreTests.vm': ['src/main/webapp/templates/GeppettoCoreTests.vm'],
+                    'src/main/webapp/templates/dist/GeppettoFluidDynamicsTests.vm': ['src/main/webapp/templates/GeppettoFluidDynamicsTests.vm'],
+                    'src/main/webapp/templates/dist/GeppettoNeuronalCustomTests.vm': ['src/main/webapp/templates/GeppettoNeuronalCustomTests.vm'],
+                    'src/main/webapp/templates/dist/GeppettoNeuronalTests.vm': ['src/main/webapp/templates/GeppettoNeuronalTests.vm'],
+                    'src/main/webapp/templates/dist/GeppettoPersistenceTests.vm': ['src/main/webapp/templates/GeppettoPersistenceTests.vm'],
+					'src/main/webapp/templates/dist/GeppettoPersistenceTests.vm': ['src/main/webapp/templates/GeppettoPersistenceTests.vm'],
+                    'src/main/webapp/templates/dist/GeppettoExternalSimulatorTests.vm': ['src/main/webapp/templates/GeppettoExternalSimulatorTests.vm']
                 }
             }
         }

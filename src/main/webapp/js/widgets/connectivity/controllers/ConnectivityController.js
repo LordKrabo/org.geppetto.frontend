@@ -39,69 +39,77 @@
  * @author Adrian Quintana (adrian.perez@ucl.ac.uk)
  * @author Boris Marin
  */
-define(function(require) {
-	var AWidgetController = require('widgets/AWidgetController');
-	var Connectivity = require('widgets/connectivity/Connectivity');
+define(function (require) {
+    var AWidgetController = require('widgets/AWidgetController');
+    var Connectivity = require('widgets/connectivity/Connectivity');
 
-	/**
-	 * @exports Widgets/Connectivity/ConnectivityController
-	 */
-	return AWidgetController.View.extend ({
+    /**
+     * @exports Widgets/Connectivity/ConnectivityController
+     */
+    return AWidgetController.View.extend({
 
-		initialize: function() {
-			this.widgets = new Array();
-		},
-
-		/**
-		 * Adds a new TreeVisualizer3D Widget to Geppetto
-		 */
-		addConnectivityWidget : function(){
-			//look for a name and id for the new widget
-			var id = this.getAvailableWidgetId("Connectivity", this.widgets);
-			var name = id;
+        initialize: function () {
+            this.widgets = Array();
+            this.history = [];
+        },
 
 
-			//create tree visualiser widget
-			var cnt = window[name] = new Connectivity({id:id, name:name,visible:false, width: 500, height: 500});
+        configureConnectivityWidget: function () {
+            Connectivity.prototype.configViaGUI();
+        },
 
-			//create help command for tree visualiser d3
-			cnt.help = function(){return GEPPETTO.Utility.getObjectCommands(id);};
+        /**
+         * Adds a new Connectivity Widget to Geppetto
+         */
+        addConnectivityWidget: function () {
+            //look for a name and id for the new widget
+            var id = this.getAvailableWidgetId("Connectivity", this.widgets);
+            var name = id;
 
-			//store in local stack
-			this.widgets.push(cnt);
 
-			GEPPETTO.WidgetsListener.subscribe(this, id);
+            //create tree visualiser widget
+            var cnt = window[name] = new Connectivity({id: id, name: name, visible: false, width: 500, height: 500, controller: this});
 
-			//add commands help option
-			GEPPETTO.Console.updateHelpCommand("geppetto/js/widgets/connectivity/Connectivity.js", cnt, id);
+            //create help command for connw
+            cnt.help = function () {
+                return GEPPETTO.Utility.getObjectCommands(id);
+            };
 
-			//update tags for autocompletion
-			GEPPETTO.Console.updateTags(cnt.getId(), cnt);
+            //store in local stack
+            this.widgets.push(cnt);
 
-			return cnt;
-		},
+            GEPPETTO.WidgetsListener.subscribe(this, id);
 
-		/**
-		 * Receives updates from widget listener class to update TreeVisualizer3D widget(s)
-		 * 
-		 * @param {WIDGET_EVENT_TYPE} event - Event that tells widgets what to do
-		 */
-		update: function(event) {
-			//delete connectivity widget(s)
-			if(event == GEPPETTO.WidgetsListener.WIDGET_EVENT_TYPE.DELETE) {
-				this.removeWidgets();
-			}
-			//update connectivity widgets
-			else if(event == GEPPETTO.WidgetsListener.WIDGET_EVENT_TYPE.UPDATE) {
-				//loop through all existing widgets
-				for(var i = 0; i < this.widgets.length; i++) {
-					var cnt = this.widgets[i];
-					//update connectivity with new data set
-					cnt.updateData();
-				}
-			}
-		}
+            //add commands help option
+            GEPPETTO.Console.updateHelpCommand(cnt, id, this.getFileComments("geppetto/js/widgets/connectivity/Connectivity.js"));
 
-		
-	});
+            //update tags for autocompletion
+            GEPPETTO.Console.updateTags(cnt.getId(), cnt);
+
+            return cnt;
+        },
+
+        /**
+         * Receives updates from widget listener class to update TreeVisualizer3D widget(s)
+         *
+         * @param {WIDGET_EVENT_TYPE} event - Event that tells widgets what to do
+         */
+        update: function (event) {
+            //delete connectivity widget(s)
+            if (event == GEPPETTO.WidgetsListener.WIDGET_EVENT_TYPE.DELETE) {
+                this.removeWidgets();
+            }
+            //update connectivity widgets
+            else if (event == GEPPETTO.WidgetsListener.WIDGET_EVENT_TYPE.UPDATE) {
+                //loop through all existing widgets
+                for (var i = 0; i < this.widgets.length; i++) {
+                    var cnt = this.widgets[i];
+                    //update connectivity with new data set
+                    cnt.updateData();
+                }
+            }
+        }
+
+
+    });
 });
